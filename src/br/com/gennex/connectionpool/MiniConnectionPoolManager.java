@@ -13,7 +13,12 @@ package br.com.gennex.connectionpool;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Stack;
+import java.util.Calendar;
+import java.util.EmptyStackException;
+import java.util.PriorityQueue;
+import java.util.Queue;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -38,6 +43,30 @@ import org.apache.log4j.Logger;
  */
 public class MiniConnectionPoolManager {
 
+	private class PCTS implements Comparable<PCTS> {
+		private PooledConnection pconn;
+		private Calendar timeStamp;
+
+		private PooledConnection getPConn() {
+			return this.pconn;
+		}
+
+		private Calendar getTimeStamp() {
+			return this.timeStamp;
+		}
+
+		private PCTS(PooledConnection pconn) {
+			this.timeStamp = Calendar.getInstance();
+			this.pconn = pconn;
+		}
+
+		@Override
+		public int compareTo(PCTS other) {
+			return (int) (other.getTimeStamp().getTimeInMillis() - this
+					.getTimeStamp().getTimeInMillis());
+		}
+	}
+
 	private class PoolConnectionEventListener implements
 			ConnectionEventListener {
 		public void connectionClosed(ConnectionEvent event) {
@@ -50,6 +79,29 @@ public class MiniConnectionPoolManager {
 			PooledConnection pconn = (PooledConnection) event.getSource();
 			pconn.removeConnectionEventListener(this);
 			disposeConnection(pconn);
+		}
+	}
+
+	private class ConnectionMonitor extends TimerTask {
+		private MiniConnectionPoolManager owner;
+
+		private ConnectionMonitor(MiniConnectionPoolManager owner) {
+			this.owner = owner;
+		}
+
+		@Override
+		public void run() {
+			Calendar now = Calendar.getInstance();
+			synchronized (owner) {
+				for (PCTS pcts : recycledConnections) {
+					int delta = (int) ((now.getTimeInMillis() - pcts
+							.getTimeStamp().getTimeInMillis()) / 1000);
+					if (delta > maxIdleConnectionLife) {
+						closeConnectionNoEx(pcts.getPConn());
+						recycledConnections.remove(pcts);
+					}
+				}
+			}
 		}
 	}
 
@@ -67,9 +119,10 @@ public class MiniConnectionPoolManager {
 
 	private ConnectionPoolDataSource dataSource;
 	private int maxConnections;
+	private int maxIdleConnectionLife;
 	private int timeout;
 	private Semaphore semaphore;
-	private Stack<PooledConnection> recycledConnections;
+	private Queue<PCTS> recycledConnections;
 	private int activeConnections;
 
 	private PoolConnectionEventListener poolConnectionEventListener;
@@ -87,7 +140,7 @@ public class MiniConnectionPoolManager {
 	 */
 	public MiniConnectionPoolManager(ConnectionPoolDataSource dataSource,
 			int maxConnections) {
-		this(dataSource, maxConnections, 60);
+		this(dataSource, maxConnections, 60, 60);
 	}
 
 	/**
@@ -101,15 +154,18 @@ public class MiniConnectionPoolManager {
 	 *            the maximum time in seconds to wait for a free connection.
 	 */
 	public MiniConnectionPoolManager(ConnectionPoolDataSource dataSource,
-			int maxConnections, int timeout) {
+			int maxConnections, int timeout, int maxIdleConnectionLife) {
 		this.dataSource = dataSource;
 		this.maxConnections = maxConnections;
+		this.maxIdleConnectionLife = maxIdleConnectionLife;
 		this.timeout = timeout;
 		if (maxConnections < 1)
 			throw new IllegalArgumentException("Invalid maxConnections value.");
 		semaphore = new Semaphore(maxConnections, true);
-		recycledConnections = new Stack<PooledConnection>();
+		recycledConnections = new PriorityQueue<PCTS>();
 		poolConnectionEventListener = new PoolConnectionEventListener();
+		new Timer(getClass().getSimpleName()).schedule(new ConnectionMonitor(
+				this), this.maxIdleConnectionLife, this.maxIdleConnectionLife);
 	}
 
 	private void assertInnerState() {
@@ -138,7 +194,10 @@ public class MiniConnectionPoolManager {
 		isDisposed = true;
 		SQLException e = null;
 		while (!recycledConnections.isEmpty()) {
-			PooledConnection pconn = recycledConnections.pop();
+			PCTS pcts = recycledConnections.poll();
+			if (pcts == null)
+				throw new EmptyStackException();
+			PooledConnection pconn = pcts.getPConn();
 			try {
 				pconn.close();
 			} catch (SQLException e2) {
@@ -151,7 +210,7 @@ public class MiniConnectionPoolManager {
 	}
 
 	private synchronized void disposeConnection(PooledConnection pconn) {
-		if (activeConnections <= 0)
+		if (activeConnections < 0)
 			throw new AssertionError();
 		activeConnections--;
 		semaphore.release();
@@ -215,8 +274,12 @@ public class MiniConnectionPoolManager {
 					"Connection pool has been disposed."); // test again with
 		// lock
 		PooledConnection pconn;
-		if (!recycledConnections.empty()) {
-			pconn = recycledConnections.pop();
+		if (recycledConnections.size() > 0) {
+			PCTS pcts = recycledConnections.poll();
+			if (pcts == null)
+				throw new EmptyStackException();
+			pconn = pcts.getPConn();
+
 		} else {
 			pconn = dataSource.getPooledConnection();
 		}
@@ -240,8 +303,7 @@ public class MiniConnectionPoolManager {
 			throw new AssertionError();
 		activeConnections--;
 		semaphore.release();
-		recycledConnections.push(pconn);
+		recycledConnections.add(new PCTS(pconn));
 		assertInnerState();
 	}
-
 }
