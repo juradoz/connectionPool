@@ -11,6 +11,7 @@
 
 package br.com.gennex.connectionpool;
 
+import java.security.InvalidParameterException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Calendar;
@@ -38,11 +39,19 @@ import org.apache.log4j.Logger;
  * href="http://www.source-code.biz">www.source-code.biz</a>)<br>
  * Multi-licensed: EPL/LGPL/MPL.
  * <p>
+ * 2009-06-25: Timeout to handle and idle connection.<br>
+ * 2009-06-24: Changed from a Stack to a Queue so it is possible do recycle more
+ * efficiently.<br>
  * 2007-06-21: Constructor with a timeout parameter added.<br>
  * 2008-05-03: Additional licenses added (EPL/MPL).
  */
 public class MiniConnectionPoolManager {
 
+	/**
+	 * Object to hold the Connection under the queue, with a TimeStamp.
+	 * 
+	 * @author Daniel Jurado
+	 */
 	private class PCTS implements Comparable<PCTS> {
 		private PooledConnection pconn;
 		private Calendar timeStamp;
@@ -60,6 +69,11 @@ public class MiniConnectionPoolManager {
 			this.pconn = pconn;
 		}
 
+		/*
+		 * (non-Javadoc)
+		 * 
+		 * @see java.lang.Comparable#compareTo(java.lang.Object)
+		 */
 		@Override
 		public int compareTo(PCTS other) {
 			return (int) (other.getTimeStamp().getTimeInMillis() - this
@@ -82,6 +96,12 @@ public class MiniConnectionPoolManager {
 		}
 	}
 
+	/**
+	 * Looks for recycled connections older than the specified seconds.
+	 * 
+	 * @author Daniel Jurado
+	 * 
+	 */
 	private class ConnectionMonitor extends TimerTask {
 		private MiniConnectionPoolManager owner;
 
@@ -96,7 +116,7 @@ public class MiniConnectionPoolManager {
 				for (PCTS pcts : recycledConnections) {
 					int delta = (int) ((now.getTimeInMillis() - pcts
 							.getTimeStamp().getTimeInMillis()) / 1000);
-					if (delta > maxIdleConnectionLife) {
+					if (delta >= maxIdleConnectionLife) {
 						closeConnectionNoEx(pcts.getPConn());
 						recycledConnections.remove(pcts);
 					}
@@ -131,7 +151,7 @@ public class MiniConnectionPoolManager {
 
 	/**
 	 * Constructs a MiniConnectionPoolManager object with a timeout of 60
-	 * seconds.
+	 * seconds and 60 seconds of max idle connection life.
 	 * 
 	 * @param dataSource
 	 *            the data source for the connections.
@@ -152,18 +172,31 @@ public class MiniConnectionPoolManager {
 	 *            the maximum number of connections.
 	 * @param timeout
 	 *            the maximum time in seconds to wait for a free connection.
+	 * @param maxIdleConnectionLife
+	 *            the maximum time in seconds to keep an idle connection to wait
+	 *            to be used.
 	 */
 	public MiniConnectionPoolManager(ConnectionPoolDataSource dataSource,
 			int maxConnections, int timeout, int maxIdleConnectionLife) {
+		if (dataSource == null)
+			throw new InvalidParameterException("dataSource cant be null");
+		if (maxConnections < 1)
+			throw new InvalidParameterException("maxConnections must be > 1");
+		if (timeout < 1)
+			throw new InvalidParameterException("timeout must be > 1");
+		if (maxIdleConnectionLife < 1)
+			throw new InvalidParameterException(
+					"maxIdleConnectionLife must be > 1");
+
 		this.dataSource = dataSource;
 		this.maxConnections = maxConnections;
 		this.maxIdleConnectionLife = maxIdleConnectionLife;
 		this.timeout = timeout;
-		if (maxConnections < 1)
-			throw new IllegalArgumentException("Invalid maxConnections value.");
 		semaphore = new Semaphore(maxConnections, true);
 		recycledConnections = new PriorityQueue<PCTS>();
 		poolConnectionEventListener = new PoolConnectionEventListener();
+
+		// start the monitor
 		new Timer(getClass().getSimpleName()).schedule(new ConnectionMonitor(
 				this), this.maxIdleConnectionLife, this.maxIdleConnectionLife);
 	}
