@@ -116,7 +116,7 @@ public class MiniConnectionPoolManager {
 				for (PCTS pcts : recycledConnections) {
 					int delta = (int) ((now.getTimeInMillis() - pcts
 							.getTimeStamp().getTimeInMillis()) / 1000);
-					if (delta >= maxIdleConnectionLife) {
+					if (delta >= maxIdleConnectionLife.getValue()) {
 						closeConnectionNoEx(pcts.getPConn());
 						recycledConnections.remove(pcts);
 					}
@@ -138,9 +138,9 @@ public class MiniConnectionPoolManager {
 	}
 
 	private ConnectionPoolDataSource dataSource;
-	private int maxConnections;
-	private int maxIdleConnectionLife;
-	private int timeout;
+	private MaxConnections maxConnections;
+	private MaxIdleConnectionLife maxIdleConnectionLife;
+	private Timeout timeout;
 	private Semaphore semaphore;
 	private Queue<PCTS> recycledConnections;
 	private int activeConnections;
@@ -159,8 +159,9 @@ public class MiniConnectionPoolManager {
 	 *            the maximum number of connections.
 	 */
 	public MiniConnectionPoolManager(ConnectionPoolDataSource dataSource,
-			int maxConnections) {
-		this(dataSource, maxConnections, 60, 60);
+			MaxConnections maxConnections) {
+		this(dataSource, maxConnections, new Timeout(60),
+				new MaxIdleConnectionLife(60));
 	}
 
 	/**
@@ -177,36 +178,40 @@ public class MiniConnectionPoolManager {
 	 *            to be used.
 	 */
 	public MiniConnectionPoolManager(ConnectionPoolDataSource dataSource,
-			int maxConnections, int timeout, int maxIdleConnectionLife) {
+			MaxConnections maxConnections, Timeout timeout,
+			MaxIdleConnectionLife maxIdleConnectionLife) {
 		if (dataSource == null)
 			throw new InvalidParameterException("dataSource cant be null");
-		if (maxConnections < 1)
-			throw new InvalidParameterException("maxConnections must be > 1");
-		if (timeout < 1)
-			throw new InvalidParameterException("timeout must be > 1");
-		if (maxIdleConnectionLife < 1)
+		if (maxConnections == null)
+			throw new InvalidParameterException("maxConnections cant be null");
+		if (timeout == null)
+			throw new InvalidParameterException("timeout cant be null");
+		if (maxIdleConnectionLife == null)
 			throw new InvalidParameterException(
-					"maxIdleConnectionLife must be > 1");
+					"maxIdleConnectionLife cant be null");
 
 		this.dataSource = dataSource;
 		this.maxConnections = maxConnections;
 		this.maxIdleConnectionLife = maxIdleConnectionLife;
 		this.timeout = timeout;
-		semaphore = new Semaphore(maxConnections, true);
+		semaphore = new Semaphore(maxConnections.getValue(), true);
 		recycledConnections = new PriorityQueue<PCTS>();
 		poolConnectionEventListener = new PoolConnectionEventListener();
 
 		// start the monitor
 		new Timer(getClass().getSimpleName()).schedule(new ConnectionMonitor(
-				this), this.maxIdleConnectionLife, this.maxIdleConnectionLife);
+				this), this.maxIdleConnectionLife.getValue(),
+				this.maxIdleConnectionLife.getValue());
 	}
 
 	private void assertInnerState() {
 		if (activeConnections < 0)
 			throw new AssertionError();
-		if (activeConnections + recycledConnections.size() > maxConnections)
+		if (activeConnections + recycledConnections.size() > maxConnections
+				.getValue())
 			throw new AssertionError();
-		if (activeConnections + semaphore.availablePermits() > maxConnections)
+		if (activeConnections + semaphore.availablePermits() > maxConnections
+				.getValue())
 			throw new AssertionError();
 	}
 
@@ -284,7 +289,7 @@ public class MiniConnectionPoolManager {
 						"Connection pool has been disposed.");
 		}
 		try {
-			if (!semaphore.tryAcquire(timeout, TimeUnit.SECONDS))
+			if (!semaphore.tryAcquire(timeout.getValue(), TimeUnit.SECONDS))
 				throw new TimeoutException();
 		} catch (InterruptedException e) {
 			throw new RuntimeException(
