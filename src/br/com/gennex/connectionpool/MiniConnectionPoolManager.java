@@ -199,9 +199,9 @@ public class MiniConnectionPoolManager {
 		poolConnectionEventListener = new PoolConnectionEventListener();
 
 		// start the monitor
-		new Timer(getClass().getSimpleName()).schedule(new ConnectionMonitor(
-				this), this.maxIdleConnectionLife.getValue(),
-				this.maxIdleConnectionLife.getValue());
+		new Timer(getClass().getSimpleName(), true).schedule(
+				new ConnectionMonitor(this), this.maxIdleConnectionLife
+						.getValue(), this.maxIdleConnectionLife.getValue());
 	}
 
 	private void assertInnerState() {
