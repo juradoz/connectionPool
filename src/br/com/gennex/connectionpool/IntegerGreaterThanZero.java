@@ -1,11 +1,13 @@
 package br.com.gennex.connectionpool;
 
+import java.security.InvalidParameterException;
+
 public class IntegerGreaterThanZero {
 	private int value;
 
 	public IntegerGreaterThanZero(int value) {
 		if (value <= 0)
-			throw new IllegalArgumentException("must be greater than zero");
+			throw new InvalidParameterException("must be greater than zero");
 		this.value = value;
 	}
 
