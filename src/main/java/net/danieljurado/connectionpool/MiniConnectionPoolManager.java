@@ -147,6 +147,7 @@ public class MiniConnectionPoolManager {
 	private Semaphore semaphore;
 	private Queue<PCTS> recycledConnections;
 	private int activeConnections;
+	private final Timer timer;
 
 	private PoolConnectionEventListener poolConnectionEventListener;
 
@@ -202,8 +203,8 @@ public class MiniConnectionPoolManager {
 		poolConnectionEventListener = new PoolConnectionEventListener();
 
 		// start the monitor
-		new Timer(getClass().getSimpleName(), true).schedule(
-				new ConnectionMonitor(this),
+		this.timer = new Timer(getClass().getSimpleName(), true);
+		this.timer.schedule(new ConnectionMonitor(this),
 				this.maxIdleConnectionLife.getValue(),
 				this.maxIdleConnectionLife.getValue());
 	}
@@ -234,6 +235,7 @@ public class MiniConnectionPoolManager {
 		if (isDisposed)
 			return;
 		isDisposed = true;
+		this.timer.cancel();
 		SQLException e = null;
 		while (!recycledConnections.isEmpty()) {
 			PCTS pcts = recycledConnections.poll();
