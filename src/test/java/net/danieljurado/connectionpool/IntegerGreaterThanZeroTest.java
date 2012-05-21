@@ -1,4 +1,4 @@
-package br.com.gennex.connectionpool;
+package net.danieljurado.connectionpool;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;

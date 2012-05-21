@@ -1,24 +1,24 @@
-package br.com.gennex.connectionpool;
+package net.danieljurado.connectionpool;
 
 import static org.junit.Assert.assertEquals;
 
 import org.junit.Before;
 import org.junit.Test;
 
-public class TimeoutTest {
+public class MaxConnectionsTest {
 
 	private static final int value = (int) (1 + Math.random() * 100);
 
-	private Timeout timeout;
+	private MaxConnections maxConnections;
 
 	@Before
 	public void setUp() throws Exception {
-		timeout = new Timeout(value);
+		maxConnections = new MaxConnections(value);
 	}
 
 	@Test
 	public void testValue() {
-		assertEquals(value, timeout.getValue());
+		assertEquals(value, maxConnections.getValue());
 	}
 
 }

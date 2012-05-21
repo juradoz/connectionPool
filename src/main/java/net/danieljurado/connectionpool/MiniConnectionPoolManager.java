@@ -9,7 +9,7 @@
 //
 // This module is provided "as is", without warranties of any kind.
 
-package br.com.gennex.connectionpool;
+package net.danieljurado.connectionpool;
 
 import java.security.InvalidParameterException;
 import java.sql.Connection;
@@ -28,7 +28,8 @@ import javax.sql.ConnectionEventListener;
 import javax.sql.ConnectionPoolDataSource;
 import javax.sql.PooledConnection;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A simple standalone JDBC connection pool manager.
@@ -46,6 +47,8 @@ import org.apache.log4j.Logger;
  * 2008-05-03: Additional licenses added (EPL/MPL).
  */
 public class MiniConnectionPoolManager {
+
+	private final Logger logger = LoggerFactory.getLogger(getClass());
 
 	/**
 	 * Object to hold the Connection under the queue, with a TimeStamp.
@@ -200,8 +203,9 @@ public class MiniConnectionPoolManager {
 
 		// start the monitor
 		new Timer(getClass().getSimpleName(), true).schedule(
-				new ConnectionMonitor(this), this.maxIdleConnectionLife
-						.getValue(), this.maxIdleConnectionLife.getValue());
+				new ConnectionMonitor(this),
+				this.maxIdleConnectionLife.getValue(),
+				this.maxIdleConnectionLife.getValue());
 	}
 
 	private void assertInnerState() {
@@ -329,7 +333,7 @@ public class MiniConnectionPoolManager {
 	}
 
 	private void log(String msg) {
-		Logger.getLogger(getClass()).error(msg);
+		logger.error(msg);
 	}
 
 	private synchronized void recycleConnection(PooledConnection pconn) {

@@ -1,4 +1,4 @@
-package br.com.gennex.connectionpool;
+package net.danieljurado.connectionpool;
 
 public class Timeout extends IntegerGreaterThanZero {
 
