@@ -7,6 +7,7 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.sql.ConnectionEvent;
 import javax.sql.ConnectionEventListener;
@@ -14,7 +15,6 @@ import javax.sql.ConnectionPoolDataSource;
 import javax.sql.PooledConnection;
 
 import net.danieljurado.connectionpool.ConnectionPoolManager;
-import net.danieljurado.connectionpool.old.MiniConnectionPoolManager.TimeoutException;
 import net.danieljurado.engine.Engine;
 import net.danieljurado.engine.EngineFactory;
 
@@ -67,7 +67,7 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
 		}
 		try {
 			if (!semaphore.tryAcquire(timeout.getSeconds(), TimeUnit.SECONDS))
-				throw new TimeoutException();
+				throw new RuntimeException(new TimeoutException());
 		} catch (InterruptedException e) {
 			throw new RuntimeException(
 					"Interrupted while waiting for a database connection.", e);
@@ -91,14 +91,17 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
 					"Connection pool has been disposed.");
 		PooledConnection pconn;
 		if (recycledConnections.size() > 0) {
+			logger.debug("retrieving connection from pool...");
 			PooledConnectionTimestamped pooledConnectionTimestamped = recycledConnections
 					.poll();
 			if (pooledConnectionTimestamped == null)
 				throw new EmptyStackException();
 			pconn = pooledConnectionTimestamped.getPooledConnection();
-
+			logger.debug("connection retrieved from pool: {}", pconn);
 		} else {
+			logger.debug("retrieving connection from datasource...");
 			pconn = dataSource.getPooledConnection();
+			logger.debug("connection retrieved from datasource: {}", pconn);
 		}
 		Connection conn = pconn.getConnection();
 		activeConnections++;
@@ -128,9 +131,9 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
 	public void dispose() {
 		if (isDisposed)
 			return;
+		logger.debug("disposing connectionpool...");
 		isDisposed = true;
 		engine.shutdown();
-		SQLException e = null;
 		while (!recycledConnections.isEmpty()) {
 			PooledConnectionTimestamped pooledConnectionTimestamped = recycledConnections
 					.poll();
@@ -138,20 +141,15 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
 				throw new EmptyStackException();
 			PooledConnection pconn = pooledConnectionTimestamped
 					.getPooledConnection();
-			try {
-				pconn.close();
-			} catch (SQLException e2) {
-				if (e == null)
-					e = e2;
-			}
+			disposeConnection(pconn);
 		}
-		if (e != null)
-			throw new RuntimeException(e);
+		logger.warn("connectionpool disposed");
 	}
 
 	@Override
 	public void connectionClosed(ConnectionEvent event) {
 		PooledConnection pconn = (PooledConnection) event.getSource();
+		logger.debug("pconn closed: {}", pconn);
 		pconn.removeConnectionEventListener(this);
 		recycleConnection(pconn);
 	}
@@ -170,6 +168,7 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
 		}
 		if (activeConnections <= 0)
 			throw new AssertionError();
+		logger.debug("recycling pcon to pool: {}", pconn);
 		activeConnections--;
 		semaphore.release();
 		recycledConnections.add(new PooledConnectionTimestamped(pconn));
@@ -179,6 +178,7 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
 	synchronized void disposeConnection(PooledConnection pconn) {
 		if (activeConnections < 0)
 			throw new AssertionError();
+		logger.debug("disposing pconn: {}", pconn);
 		activeConnections--;
 		semaphore.release();
 		closeConnectionNoEx(pconn);
@@ -186,6 +186,8 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
 	}
 
 	void assertInnerState() {
+		if (isDisposed)
+			return;
 		if (activeConnections < 0)
 			throw new AssertionError();
 		if (activeConnections + recycledConnections.size() > maxConnections)

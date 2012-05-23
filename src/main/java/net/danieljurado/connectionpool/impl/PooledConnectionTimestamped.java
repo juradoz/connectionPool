@@ -3,6 +3,7 @@ package net.danieljurado.connectionpool.impl;
 import javax.sql.PooledConnection;
 
 import org.apache.commons.lang.builder.CompareToBuilder;
+import org.apache.commons.lang.builder.ToStringBuilder;
 import org.joda.time.DateTime;
 
 class PooledConnectionTimestamped implements
@@ -27,5 +28,10 @@ class PooledConnectionTimestamped implements
 	public int compareTo(PooledConnectionTimestamped other) {
 		return new CompareToBuilder().append(other.timestamp, timestamp)
 				.toComparison();
+	}
+
+	@Override
+	public String toString() {
+		return ToStringBuilder.reflectionToString(this);
 	}
 }
