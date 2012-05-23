@@ -15,8 +15,28 @@ import com.google.inject.BindingAnnotation;
 
 public class ConnectionPoolModule extends AbstractModule {
 
+	@Retention(RUNTIME)
+	@Target({ PARAMETER })
+	@BindingAnnotation
+	public @interface MaxConnections {
+	}
+
+	@Retention(RUNTIME)
+	@Target({ PARAMETER })
+	@BindingAnnotation
+	public @interface MaxIdleConnectionLife {
+	}
+
+	@Retention(RUNTIME)
+	@Target({ PARAMETER })
+	@BindingAnnotation
+	public @interface Timeout {
+	}
+
 	private final int maxConnections;
+
 	private final Period timeout;
+
 	private final Period maxIdleConnectionLife;
 
 	public ConnectionPoolModule() {
@@ -28,24 +48,6 @@ public class ConnectionPoolModule extends AbstractModule {
 		this.maxConnections = maxConnections;
 		this.timeout = timeout;
 		this.maxIdleConnectionLife = maxIdleConnectionLife;
-	}
-
-	@Retention(RUNTIME)
-	@Target({ PARAMETER })
-	@BindingAnnotation
-	public @interface MaxConnections {
-	}
-
-	@Retention(RUNTIME)
-	@Target({ PARAMETER })
-	@BindingAnnotation
-	public @interface Timeout {
-	}
-
-	@Retention(RUNTIME)
-	@Target({ PARAMETER })
-	@BindingAnnotation
-	public @interface MaxIdleConnectionLife {
 	}
 
 	@Override
