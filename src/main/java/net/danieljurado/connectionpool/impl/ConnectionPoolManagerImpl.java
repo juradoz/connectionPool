@@ -52,10 +52,74 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
 			@Named("timeout") Period maxIdleConnectionLife) {
 		this.dataSource = dataSource;
 		this.maxConnections = maxConnections;
-		this.semaphore = new Semaphore(maxConnections, true);
+		semaphore = new Semaphore(maxConnections, true);
 		this.timeout = timeout;
 		this.maxIdleConnectionLife = maxIdleConnectionLife;
-		this.engine = engineFactory.create(this, timeout, true);
+		engine = engineFactory.create(this, timeout, true);
+	}
+
+	void assertInnerState() {
+		if (isDisposed)
+			return;
+		if (activeConnections < 0)
+			throw new AssertionError();
+		if (activeConnections + recycledConnections.size() > maxConnections)
+			throw new AssertionError();
+		if (activeConnections + semaphore.availablePermits() > maxConnections)
+			throw new AssertionError();
+	}
+
+	void closeConnectionNoEx(PooledConnection pconn) {
+		try {
+			pconn.close();
+		} catch (SQLException e) {
+			logger.error("Error while closing database connection: {}",
+					e.getMessage());
+		}
+	}
+
+	@Override
+	public void connectionClosed(ConnectionEvent event) {
+		PooledConnection pconn = (PooledConnection) event.getSource();
+		logger.debug("pconn closed: {}", pconn);
+		pconn.removeConnectionEventListener(this);
+		recycleConnection(pconn);
+	}
+
+	@Override
+	public void connectionErrorOccurred(ConnectionEvent event) {
+		PooledConnection pconn = (PooledConnection) event.getSource();
+		pconn.removeConnectionEventListener(this);
+		disposeConnection(pconn);
+	}
+
+	@Override
+	public void dispose() {
+		if (isDisposed)
+			return;
+		logger.debug("disposing connectionpool...");
+		isDisposed = true;
+		engine.shutdown();
+		while (!recycledConnections.isEmpty()) {
+			PooledConnectionTimestamped pooledConnectionTimestamped = recycledConnections
+					.poll();
+			if (pooledConnectionTimestamped == null)
+				throw new EmptyStackException();
+			PooledConnection pconn = pooledConnectionTimestamped
+					.getPooledConnection();
+			disposeConnection(pconn);
+		}
+		logger.warn("connectionpool disposed");
+	}
+
+	synchronized void disposeConnection(PooledConnection pconn) {
+		if (activeConnections < 0)
+			throw new AssertionError();
+		logger.debug("disposing pconn: {}", pconn);
+		activeConnections--;
+		semaphore.release();
+		closeConnectionNoEx(pconn);
+		assertInnerState();
 	}
 
 	@Override
@@ -110,57 +174,6 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
 		return conn;
 	}
 
-	@Override
-	public void run() {
-		DateTime now = new DateTime();
-		synchronized (this) {
-			for (PooledConnectionTimestamped pooledConnectionTimestamped : recycledConnections) {
-				Period period = new Period(
-						pooledConnectionTimestamped.getTimestamp(), now);
-				if (period.toDurationFrom(now).isLongerThan(
-						maxIdleConnectionLife.toDurationFrom(now))) {
-					closeConnectionNoEx(pooledConnectionTimestamped
-							.getPooledConnection());
-					recycledConnections.remove(pooledConnectionTimestamped);
-				}
-			}
-		}
-	}
-
-	@Override
-	public void dispose() {
-		if (isDisposed)
-			return;
-		logger.debug("disposing connectionpool...");
-		isDisposed = true;
-		engine.shutdown();
-		while (!recycledConnections.isEmpty()) {
-			PooledConnectionTimestamped pooledConnectionTimestamped = recycledConnections
-					.poll();
-			if (pooledConnectionTimestamped == null)
-				throw new EmptyStackException();
-			PooledConnection pconn = pooledConnectionTimestamped
-					.getPooledConnection();
-			disposeConnection(pconn);
-		}
-		logger.warn("connectionpool disposed");
-	}
-
-	@Override
-	public void connectionClosed(ConnectionEvent event) {
-		PooledConnection pconn = (PooledConnection) event.getSource();
-		logger.debug("pconn closed: {}", pconn);
-		pconn.removeConnectionEventListener(this);
-		recycleConnection(pconn);
-	}
-
-	@Override
-	public void connectionErrorOccurred(ConnectionEvent event) {
-		PooledConnection pconn = (PooledConnection) event.getSource();
-		pconn.removeConnectionEventListener(this);
-		disposeConnection(pconn);
-	}
-
 	synchronized void recycleConnection(PooledConnection pconn) {
 		if (isDisposed) {
 			disposeConnection(pconn);
@@ -175,33 +188,20 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
 		assertInnerState();
 	}
 
-	synchronized void disposeConnection(PooledConnection pconn) {
-		if (activeConnections < 0)
-			throw new AssertionError();
-		logger.debug("disposing pconn: {}", pconn);
-		activeConnections--;
-		semaphore.release();
-		closeConnectionNoEx(pconn);
-		assertInnerState();
-	}
-
-	void assertInnerState() {
-		if (isDisposed)
-			return;
-		if (activeConnections < 0)
-			throw new AssertionError();
-		if (activeConnections + recycledConnections.size() > maxConnections)
-			throw new AssertionError();
-		if (activeConnections + semaphore.availablePermits() > maxConnections)
-			throw new AssertionError();
-	}
-
-	void closeConnectionNoEx(PooledConnection pconn) {
-		try {
-			pconn.close();
-		} catch (SQLException e) {
-			logger.error("Error while closing database connection: {}",
-					e.getMessage());
+	@Override
+	public void run() {
+		DateTime now = new DateTime();
+		synchronized (this) {
+			for (PooledConnectionTimestamped pooledConnectionTimestamped : recycledConnections) {
+				Period period = new Period(
+						pooledConnectionTimestamped.getTimestamp(), now);
+				if (period.toDurationFrom(now).isLongerThan(
+						maxIdleConnectionLife.toDurationFrom(now))) {
+					closeConnectionNoEx(pooledConnectionTimestamped
+							.getPooledConnection());
+					recycledConnections.remove(pooledConnectionTimestamped);
+				}
+			}
 		}
 	}
 

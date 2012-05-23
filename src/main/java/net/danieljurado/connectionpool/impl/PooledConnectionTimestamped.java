@@ -16,18 +16,18 @@ class PooledConnectionTimestamped implements
 		this.pooledConnection = pooledConnection;
 	}
 
+	@Override
+	public int compareTo(PooledConnectionTimestamped other) {
+		return new CompareToBuilder().append(other.timestamp, timestamp)
+				.toComparison();
+	}
+
 	public PooledConnection getPooledConnection() {
 		return pooledConnection;
 	}
 
 	public DateTime getTimestamp() {
 		return timestamp;
-	}
-
-	@Override
-	public int compareTo(PooledConnectionTimestamped other) {
-		return new CompareToBuilder().append(other.timestamp, timestamp)
-				.toComparison();
 	}
 
 	@Override
