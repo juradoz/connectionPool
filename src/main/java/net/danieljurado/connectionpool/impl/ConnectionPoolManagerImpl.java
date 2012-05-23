@@ -15,6 +15,9 @@ import javax.sql.ConnectionPoolDataSource;
 import javax.sql.PooledConnection;
 
 import net.danieljurado.connectionpool.ConnectionPoolManager;
+import net.danieljurado.connectionpool.impl.ConnectionPoolModule.MaxConnections;
+import net.danieljurado.connectionpool.impl.ConnectionPoolModule.MaxIdleConnectionLife;
+import net.danieljurado.connectionpool.impl.ConnectionPoolModule.Timeout;
 import net.danieljurado.engine.Engine;
 import net.danieljurado.engine.EngineFactory;
 
@@ -25,7 +28,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import com.google.inject.name.Named;
 
 @Singleton
 class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
@@ -47,9 +49,8 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
 	@Inject
 	ConnectionPoolManagerImpl(EngineFactory engineFactory,
 			ConnectionPoolDataSource dataSource,
-			@Named("maxConnections") int maxConnections,
-			@Named("timeout") Period timeout,
-			@Named("timeout") Period maxIdleConnectionLife) {
+			@MaxConnections int maxConnections, @Timeout Period timeout,
+			@MaxIdleConnectionLife Period maxIdleConnectionLife) {
 		this.dataSource = dataSource;
 		this.maxConnections = maxConnections;
 		semaphore = new Semaphore(maxConnections, true);

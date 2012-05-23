@@ -1,11 +1,17 @@
 package net.danieljurado.connectionpool.impl;
 
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
 import net.danieljurado.connectionpool.ConnectionPoolManager;
 
 import org.joda.time.Period;
 
 import com.google.inject.AbstractModule;
-import com.google.inject.name.Names;
+import com.google.inject.BindingAnnotation;
 
 public class ConnectionPoolModule extends AbstractModule {
 
@@ -24,13 +30,29 @@ public class ConnectionPoolModule extends AbstractModule {
 		this.maxIdleConnectionLife = maxIdleConnectionLife;
 	}
 
+	@Retention(RUNTIME)
+	@Target({ PARAMETER })
+	@BindingAnnotation
+	public @interface MaxConnections {
+	}
+
+	@Retention(RUNTIME)
+	@Target({ PARAMETER })
+	@BindingAnnotation
+	public @interface Timeout {
+	}
+
+	@Retention(RUNTIME)
+	@Target({ PARAMETER })
+	@BindingAnnotation
+	public @interface MaxIdleConnectionLife {
+	}
+
 	@Override
 	protected void configure() {
-		bindConstant().annotatedWith(Names.named("maxConnections")).to(
-				maxConnections);
-		bind(Period.class).annotatedWith(Names.named("timeout")).toInstance(
-				timeout);
-		bind(Period.class).annotatedWith(Names.named("maxIdleConnectionLife"))
+		bindConstant().annotatedWith(MaxConnections.class).to(maxConnections);
+		bind(Period.class).annotatedWith(Timeout.class).toInstance(timeout);
+		bind(Period.class).annotatedWith(MaxIdleConnectionLife.class)
 				.toInstance(maxIdleConnectionLife);
 		bind(ConnectionPoolManager.class).to(ConnectionPoolManagerImpl.class);
 	}
