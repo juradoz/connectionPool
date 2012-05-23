@@ -5,6 +5,8 @@ import static org.junit.Assert.fail;
 
 import java.security.InvalidParameterException;
 
+import net.danieljurado.connectionpool.old.IntegerGreaterThanZero;
+
 import org.junit.Test;
 
 public class IntegerGreaterThanZeroTest {

@@ -9,7 +9,7 @@
 //
 // This module is provided "as is", without warranties of any kind.
 
-package net.danieljurado.connectionpool;
+package net.danieljurado.connectionpool.old;
 
 import java.security.InvalidParameterException;
 import java.sql.Connection;

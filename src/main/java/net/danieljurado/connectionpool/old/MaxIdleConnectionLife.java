@@ -1,4 +1,4 @@
-package net.danieljurado.connectionpool;
+package net.danieljurado.connectionpool.old;
 
 public class MaxIdleConnectionLife extends IntegerGreaterThanZero {
 

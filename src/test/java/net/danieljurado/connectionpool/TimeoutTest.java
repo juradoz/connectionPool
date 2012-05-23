@@ -2,6 +2,8 @@ package net.danieljurado.connectionpool;
 
 import static org.junit.Assert.assertEquals;
 
+import net.danieljurado.connectionpool.old.Timeout;
+
 import org.junit.Before;
 import org.junit.Test;
 
