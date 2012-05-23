@@ -2,7 +2,7 @@ package net.danieljurado.connectionpool.impl;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThat;
 import static org.mockito.MockitoAnnotations.initMocks;
 
 import javax.sql.PooledConnection;
@@ -18,18 +18,18 @@ public class PooledConnectionTimestampedTest {
 	private PooledConnection pooledConnection;
 	private PooledConnectionTimestamped pooledConnectionTimestamped;
 
-	@Before
-	public void setUp() {
-		initMocks(this);
-		pooledConnectionTimestamped = new PooledConnectionTimestamped(
-				pooledConnection);
-	}
-
 	@Test
 	public void defaultToString() {
 		assertThat(pooledConnectionTimestamped.toString(),
 				is(equalTo(ToStringBuilder
 						.reflectionToString(pooledConnectionTimestamped))));
+	}
+
+	@Before
+	public void setUp() {
+		initMocks(this);
+		pooledConnectionTimestamped = new PooledConnectionTimestamped(
+				pooledConnection);
 	}
 
 }
