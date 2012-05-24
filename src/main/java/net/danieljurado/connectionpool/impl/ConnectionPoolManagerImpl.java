@@ -3,8 +3,7 @@ package net.danieljurado.connectionpool.impl;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Iterator;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Stack;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -38,7 +37,7 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager,
 	private final Period maxIdleConnectionLife;
 	private final Period acquireTimeout;
 
-	private final Queue<TSPooledConnection> queue = new ConcurrentLinkedQueue<TSPooledConnection>();
+	private final Stack<TSPooledConnection> stack = new Stack<TSPooledConnection>();
 	private final Semaphore semaphore;
 
 	@Inject
@@ -74,8 +73,8 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager,
 			synchronized (this) {
 				PooledConnection pooledConnection;
 				try {
-					if (queue.size() > 0) {
-						pooledConnection = queue.poll();
+					if (!stack.empty()) {
+						pooledConnection = stack.pop();
 						logger.debug("Obtive connection do pool: {}",
 								pooledConnection);
 					} else {
@@ -105,7 +104,7 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager,
 		synchronized (this) {
 			logger.debug("Devolvendo conexao ao pool: {}", pooledConnection);
 			pooledConnection.removeConnectionEventListener(this);
-			queue.offer(new TSPooledConnection(pooledConnection));
+			stack.push(new TSPooledConnection(pooledConnection));
 			semaphore.release();
 		}
 	}
@@ -124,9 +123,9 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager,
 
 	@Override
 	public void run() {
-		logger.info("Connecions no pool: {}", queue.size());
+		logger.debug("Connecions no pool: {}", stack.size());
 		synchronized (this) {
-			for (Iterator<TSPooledConnection> iterator = queue.iterator(); iterator
+			for (Iterator<TSPooledConnection> iterator = stack.iterator(); iterator
 					.hasNext();) {
 				TSPooledConnection tsPooledConnection = iterator.next();
 				if (tsPooledConnection.getTimestamp()
