@@ -5,14 +5,19 @@ import javax.sql.PooledConnection;
 import org.apache.commons.lang.builder.CompareToBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.joda.time.DateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 class PooledConnectionTimestamped implements
 		Comparable<PooledConnectionTimestamped> {
+
+	private final Logger logger = LoggerFactory.getLogger(getClass());
 
 	private final PooledConnection pooledConnection;
 	private final DateTime timestamp = new DateTime();
 
 	PooledConnectionTimestamped(PooledConnection pooledConnection) {
+		logger.debug("Nova instancia");
 		this.pooledConnection = pooledConnection;
 	}
 

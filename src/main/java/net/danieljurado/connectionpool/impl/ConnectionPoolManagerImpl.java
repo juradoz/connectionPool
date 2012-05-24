@@ -3,6 +3,7 @@ package net.danieljurado.connectionpool.impl;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.EmptyStackException;
+import java.util.Iterator;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.concurrent.Semaphore;
@@ -51,6 +52,7 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
 			ConnectionPoolDataSource dataSource,
 			@MaxConnections int maxConnections, @Timeout Period timeout,
 			@MaxIdleConnectionLife Period maxIdleConnectionLife) {
+		logger.debug("Nova instancia");
 		this.dataSource = dataSource;
 		this.maxConnections = maxConnections;
 		semaphore = new Semaphore(maxConnections, true);
@@ -192,15 +194,22 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager, Runnable,
 	@Override
 	public void run() {
 		DateTime now = new DateTime();
+		logger.debug(
+				"activeConnections: {}, recycledConnections: {}, availablePermits: {}",
+				new Object[] { activeConnections, recycledConnections.size(),
+						semaphore.availablePermits() });
 		synchronized (this) {
-			for (PooledConnectionTimestamped pooledConnectionTimestamped : recycledConnections) {
+			for (Iterator<PooledConnectionTimestamped> it = recycledConnections
+					.iterator(); it.hasNext();) {
+				PooledConnectionTimestamped pooledConnectionTimestamped = it
+						.next();
 				Period period = new Period(
 						pooledConnectionTimestamped.getTimestamp(), now);
 				if (period.toDurationFrom(now).isLongerThan(
 						maxIdleConnectionLife.toDurationFrom(now))) {
 					closeConnectionNoEx(pooledConnectionTimestamped
 							.getPooledConnection());
-					recycledConnections.remove(pooledConnectionTimestamped);
+					it.remove();
 				}
 			}
 		}
