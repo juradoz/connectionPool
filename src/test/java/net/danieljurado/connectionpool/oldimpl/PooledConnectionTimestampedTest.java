@@ -1,4 +1,4 @@
-package net.danieljurado.connectionpool.impl;
+package net.danieljurado.connectionpool.oldimpl;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
@@ -6,6 +6,8 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.MockitoAnnotations.initMocks;
 
 import javax.sql.PooledConnection;
+
+import net.danieljurado.connectionpool.oldimpl.PooledConnectionTimestamped;
 
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.junit.Before;

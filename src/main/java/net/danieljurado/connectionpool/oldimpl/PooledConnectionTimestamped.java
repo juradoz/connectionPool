@@ -1,4 +1,4 @@
-package net.danieljurado.connectionpool.impl;
+package net.danieljurado.connectionpool.oldimpl;
 
 import javax.sql.PooledConnection;
 
