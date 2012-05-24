@@ -14,13 +14,14 @@ import org.slf4j.LoggerFactory;
 class TSPooledConnection implements PooledConnection,
 		Comparable<TSPooledConnection> {
 
-	private final Logger logger = LoggerFactory.getLogger(getClass());
+	private static final Logger logger = LoggerFactory
+			.getLogger(TSPooledConnection.class);
 
 	private final DateTime timestamp = new DateTime();
 	private final PooledConnection pooledConnection;
 
 	TSPooledConnection(PooledConnection pooledConnection) {
-		logger.info("Nova instancia");
+		logger.debug("Nova instancia");
 		this.pooledConnection = pooledConnection;
 	}
 
@@ -57,6 +58,10 @@ class TSPooledConnection implements PooledConnection,
 	@Override
 	public int compareTo(TSPooledConnection o) {
 		return o.timestamp.compareTo(timestamp);
+	}
+
+	public DateTime getTimestamp() {
+		return timestamp;
 	}
 
 }

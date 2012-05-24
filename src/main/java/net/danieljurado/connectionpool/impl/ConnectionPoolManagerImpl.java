@@ -2,8 +2,9 @@ package net.danieljurado.connectionpool.impl;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.PriorityQueue;
+import java.util.Iterator;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -13,6 +14,9 @@ import javax.sql.ConnectionPoolDataSource;
 import javax.sql.PooledConnection;
 
 import net.danieljurado.connectionpool.ConnectionPoolManager;
+import net.danieljurado.connectionpool.impl.ConnectionPoolModule.AcquireTimeout;
+import net.danieljurado.connectionpool.impl.ConnectionPoolModule.MaxConnections;
+import net.danieljurado.connectionpool.impl.ConnectionPoolModule.MaxIdleConnectionLife;
 import net.danieljurado.engine.Engine;
 import net.danieljurado.engine.EngineFactory;
 
@@ -31,15 +35,22 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager,
 
 	private final ConnectionPoolDataSource dataSource;
 	private final Engine engine;
+	private final Period maxIdleConnectionLife;
+	private final Period acquireTimeout;
 
-	private final Queue<PooledConnection> queue = new PriorityQueue<PooledConnection>();
-	private final Semaphore semaphore = new Semaphore(10, true);
+	private final Queue<TSPooledConnection> queue = new ConcurrentLinkedQueue<TSPooledConnection>();
+	private final Semaphore semaphore;
 
 	@Inject
 	ConnectionPoolManagerImpl(ConnectionPoolDataSource dataSource,
-			EngineFactory engineFactory) {
+			EngineFactory engineFactory, @MaxConnections int maxConnections,
+			@MaxIdleConnectionLife Period maxIdleConnectionLife,
+			@AcquireTimeout Period acquireTimeout) {
 		this.dataSource = dataSource;
 		this.engine = engineFactory.create(this, Period.seconds(5), true);
+		this.semaphore = new Semaphore(maxConnections, true);
+		this.maxIdleConnectionLife = maxIdleConnectionLife;
+		this.acquireTimeout = acquireTimeout;
 	}
 
 	@Override
@@ -51,7 +62,8 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager,
 	public Connection getConnection() {
 
 		try {
-			if (!semaphore.tryAcquire(10, TimeUnit.SECONDS))
+			if (!semaphore.tryAcquire(acquireTimeout.getSeconds(),
+					TimeUnit.SECONDS))
 				throw new RuntimeException("timeout");
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
@@ -64,11 +76,10 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager,
 				try {
 					if (queue.size() > 0) {
 						pooledConnection = queue.poll();
-						logger.info("Obtive connection do pool: {}",
+						logger.debug("Obtive connection do pool: {}",
 								pooledConnection);
 					} else {
-						pooledConnection = new TSPooledConnection(
-								dataSource.getPooledConnection());
+						pooledConnection = dataSource.getPooledConnection();
 						logger.info("Obtive connection do datasource: {}",
 								pooledConnection);
 					}
@@ -92,9 +103,9 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager,
 		PooledConnection pooledConnection = (PooledConnection) event
 				.getSource();
 		synchronized (this) {
-			logger.info("Devolvendo conexao ao pool: {}", pooledConnection);
+			logger.debug("Devolvendo conexao ao pool: {}", pooledConnection);
 			pooledConnection.removeConnectionEventListener(this);
-			queue.offer(pooledConnection);
+			queue.offer(new TSPooledConnection(pooledConnection));
 			semaphore.release();
 		}
 	}
@@ -114,6 +125,18 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager,
 	@Override
 	public void run() {
 		logger.info("Connecions no pool: {}", queue.size());
+		synchronized (this) {
+			for (Iterator<TSPooledConnection> iterator = queue.iterator(); iterator
+					.hasNext();) {
+				TSPooledConnection tsPooledConnection = iterator.next();
+				if (tsPooledConnection.getTimestamp()
+						.plus(maxIdleConnectionLife).isAfterNow())
+					continue;
+				logger.warn("Removendo connection por inatividade: {}",
+						tsPooledConnection);
+				iterator.remove();
+			}
+		}
 	}
 
 }

@@ -18,19 +18,19 @@ class ConnectionPoolModule extends AbstractModule {
 	@Retention(RUNTIME)
 	@Target({ PARAMETER })
 	@BindingAnnotation
-	public @interface MaxConnections {
+	@interface MaxConnections {
 	}
 
 	@Retention(RUNTIME)
 	@Target({ PARAMETER })
 	@BindingAnnotation
-	public @interface MaxIdleConnectionLife {
+	@interface MaxIdleConnectionLife {
 	}
 
 	@Retention(RUNTIME)
 	@Target({ PARAMETER })
 	@BindingAnnotation
-	public @interface Timeout {
+	@interface Timeout {
 	}
 
 	private final int maxConnections;
