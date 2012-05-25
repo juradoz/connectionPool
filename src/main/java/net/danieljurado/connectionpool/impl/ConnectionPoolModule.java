@@ -18,28 +18,28 @@ public class ConnectionPoolModule extends AbstractModule {
 	@Retention(RUNTIME)
 	@Target({ PARAMETER })
 	@BindingAnnotation
-	public @interface MaxConnections {
+	public @interface MaxConnectionsParameter {
 	}
 
 	@Retention(RUNTIME)
 	@Target({ PARAMETER })
 	@BindingAnnotation
-	public @interface MaxIdleConnectionLife {
+	public @interface MaxIdleConnectionLifeParameter {
 	}
 
 	@Retention(RUNTIME)
 	@Target({ PARAMETER })
 	@BindingAnnotation
-	@interface AcquireTimeout {
+	@interface AcquireTimeoutParameter {
 	}
 
 	@Override
 	protected void configure() {
-		bindConstant().annotatedWith(MaxConnections.class).to(10);
-		bind(Period.class).annotatedWith(MaxIdleConnectionLife.class)
+		bindConstant().annotatedWith(MaxConnectionsParameter.class).to(10);
+		bind(Period.class).annotatedWith(MaxIdleConnectionLifeParameter.class)
 				.toInstance(Period.minutes(1));
-		bind(Period.class).annotatedWith(AcquireTimeout.class).toInstance(
-				Period.seconds(10));
+		bind(Period.class).annotatedWith(AcquireTimeoutParameter.class)
+				.toInstance(Period.seconds(10));
 		bind(ConnectionPoolManager.class).to(ConnectionPoolManagerImpl.class);
 	}
 

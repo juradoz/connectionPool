@@ -13,9 +13,9 @@ import javax.sql.ConnectionPoolDataSource;
 import javax.sql.PooledConnection;
 
 import net.danieljurado.connectionpool.ConnectionPoolManager;
-import net.danieljurado.connectionpool.impl.ConnectionPoolModule.AcquireTimeout;
-import net.danieljurado.connectionpool.impl.ConnectionPoolModule.MaxConnections;
-import net.danieljurado.connectionpool.impl.ConnectionPoolModule.MaxIdleConnectionLife;
+import net.danieljurado.connectionpool.impl.ConnectionPoolModule.AcquireTimeoutParameter;
+import net.danieljurado.connectionpool.impl.ConnectionPoolModule.MaxConnectionsParameter;
+import net.danieljurado.connectionpool.impl.ConnectionPoolModule.MaxIdleConnectionLifeParameter;
 import net.danieljurado.engine.Engine;
 import net.danieljurado.engine.EngineFactory;
 
@@ -42,9 +42,9 @@ class ConnectionPoolManagerImpl implements ConnectionPoolManager,
 
 	@Inject
 	ConnectionPoolManagerImpl(ConnectionPoolDataSource dataSource,
-			EngineFactory engineFactory, @MaxConnections int maxConnections,
-			@MaxIdleConnectionLife Period maxIdleConnectionLife,
-			@AcquireTimeout Period acquireTimeout) {
+			EngineFactory engineFactory, @MaxConnectionsParameter int maxConnections,
+			@MaxIdleConnectionLifeParameter Period maxIdleConnectionLife,
+			@AcquireTimeoutParameter Period acquireTimeout) {
 		this.dataSource = dataSource;
 		this.engine = engineFactory.create(this, Period.seconds(5), true);
 		this.semaphore = new Semaphore(maxConnections, true);
